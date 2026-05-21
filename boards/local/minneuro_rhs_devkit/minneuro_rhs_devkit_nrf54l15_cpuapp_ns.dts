@@ -1,0 +1,181 @@
+/*
+ * MinNeuro RHS DevKit — nRF54L15 Application MCU, non-secure image.
+ * Partition layout must stay in sync with TF-M (see Nordic
+ * nrf54l15_cpuapp_ns_partition.dtsi).
+ */
+
+/dts-v1/;
+
+#define USE_NON_SECURE_ADDRESS_MAP 1
+
+#include <arm/nordic/nrf54l15_cpuapp_ns.dtsi>
+
+/ {
+	model = "MinNeuro RHS DevKit nRF54L15 Application MCU";
+	compatible = "local,minneuro_rhs_devkit_nrf54l15-cpuapp";
+
+	chosen {
+		zephyr,flash-controller = &rram_controller;
+		zephyr,flash = &cpuapp_rram;
+		zephyr,code-partition = &slot0_ns_partition;
+		zephyr,sram = &sram0_ns;
+		zephyr,entropy = &psa_rng;
+	};
+
+	/delete-node/ rng;
+
+	psa_rng: psa-rng {
+		status = "okay";
+	};
+};
+
+#include <vendor/nordic/nrf54l15_cpuapp_ns_partition.dtsi>
+
+&cpuapp_sram {
+	status = "okay";
+};
+
+&lfxo {
+	load-capacitors = "internal";
+	load-capacitance-femtofarad = <15500>;
+};
+
+&hfxo {
+	load-capacitors = "internal";
+	load-capacitance-femtofarad = <15000>;
+};
+
+&regulators {
+	status = "okay";
+};
+
+&vregmain {
+	status = "okay";
+	regulator-initial-mode = <NRF5X_REG_MODE_DCDC>;
+};
+
+&grtc {
+	owned-channels = <0 1 2 3 4 5 6 7 8 9 10 11>;
+	child-owned-channels = <3 4 7 8 9 10 11>;
+	status = "okay";
+};
+
+&clock {
+	status = "okay";
+};
+
+&gpio0 {
+	status = "okay";
+};
+
+&gpio1 {
+	status = "okay";
+};
+
+&gpio2 {
+	status = "okay";
+};
+
+&gpiote20 {
+	status = "okay";
+};
+
+&gpiote30 {
+	status = "okay";
+};
+
+&pinctrl {
+	/* TF-M secure image uses UARTE30; match nRF54L15 DK pins unless your schematic differs. */
+	uart30_default: uart30_default {
+		group1 {
+			psels = <NRF_PSEL(UART_TX, 0, 0)>,
+				<NRF_PSEL(UART_RTS, 0, 2)>;
+		};
+
+		group2 {
+			psels = <NRF_PSEL(UART_RX, 0, 1)>,
+				<NRF_PSEL(UART_CTS, 0, 3)>;
+			bias-pull-up;
+		};
+	};
+
+	uart30_sleep: uart30_sleep {
+		group1 {
+			psels = <NRF_PSEL(UART_TX, 0, 0)>,
+				<NRF_PSEL(UART_RX, 0, 1)>,
+				<NRF_PSEL(UART_RTS, 0, 2)>,
+				<NRF_PSEL(UART_CTS, 0, 3)>;
+			low-power-enable;
+		};
+	};
+
+	spi00_default: spi00_default {
+		group1 {
+			psels = <NRF_PSEL(SPIM_SCK, 2, 6)>,
+				<NRF_PSEL(SPIM_MISO, 2, 9)>,
+				<NRF_PSEL(SPIM_MOSI, 2, 8)>;
+		};
+	};
+
+	spi00_sleep: spi00_sleep {
+		group1 {
+			psels = <NRF_PSEL(SPIM_SCK, 2, 6)>,
+				<NRF_PSEL(SPIM_MISO, 2, 9)>,
+				<NRF_PSEL(SPIM_MOSI, 2, 8)>;
+			low-power-enable;
+		};
+	};
+};
+
+&uart20 {
+	status = "disabled";
+};
+
+&uart30 {
+	/* Disable Zephyr driver in NS; TF-M still requires this node + pinctrl for secure build. */
+	status = "disabled";
+
+	current-speed = <115200>;
+	pinctrl-0 = <&uart30_default>;
+	pinctrl-1 = <&uart30_sleep>;
+	pinctrl-names = "default", "sleep";
+};
+
+&pwm20 {
+	status = "disabled";
+};
+
+&spi00 {
+	compatible = "nordic,nrf-spim";
+	status = "okay";
+	pinctrl-0 = <&spi00_default>;
+	pinctrl-1 = <&spi00_sleep>;
+	pinctrl-names = "default", "sleep";
+	cs-gpios = <&gpio2 5 GPIO_ACTIVE_LOW>;
+
+	/* Disabled during SD-card/SPI bring-up: DAC80501 uses spi00 with SPI_MODE_CPHA (mode 1),
+	 * which conflicts with sharing the same SPIM instance as the SD SPI HAL (mode 0).
+	 * Re-enable when DAC path is migrated onto Zephyr SPI with coordinated bus usage.
+	 */
+	stim_dac: dac80501@0 {
+		compatible = "ti,dac80501-spi";
+		status = "disabled";
+		reg = <0>;
+		spi-max-frequency = <8000000>;
+		voltage-reference = "internal";
+		output-gain = "div2-x2";
+		#io-channel-cells = <1>;
+	};
+};
+
+&adc {
+	status = "disabled";
+};
+
+&radio {
+	status = "okay";
+};
+
+&ieee802154 {
+	status = "disabled";
+};

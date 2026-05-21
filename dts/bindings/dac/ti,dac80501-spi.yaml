@@ -1,0 +1,37 @@
+# Copyright (c) 2025 MinNeuro
+# SPDX-License-Identifier: Apache-2.0
+
+description: |
+  TI DAC80501 16-bit DAC (SPI variant).
+  SPI frame format: 24-bit (8-bit register address + 16-bit data).
+  CPOL=0, CPHA=1 (SPI mode 1).
+
+compatible: "ti,dac80501-spi"
+
+include: [dac-controller.yaml, spi-device.yaml]
+
+properties:
+  voltage-reference:
+    type: string
+    required: true
+    enum:
+      - "internal"
+      - "external"
+    description: |
+      DAC voltage reference select: either internal (2.5 V) or external.
+
+  output-gain:
+    type: string
+    required: true
+    enum:
+      - "mul2"
+      - "mul1"
+      - "div2"
+      - "div2-x2"
+    description: |
+      Output voltage range control.
+        mul2:    VREF * 2 (buffer gain 2x, ref divider off)  → 5.0 V
+        mul1:    VREF * 1 (buffer gain 1x, ref divider off)  → 2.5 V
+        div2:    VREF / 2 (buffer gain 1x, ref divider on)   → 1.25 V
+        div2-x2: VREF/2 * 2 (ref divider on + buffer gain 2x) → 2.5 V
+                 Safe for 3.3 V rails (avoids REF-ALARM).

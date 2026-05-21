@@ -1,0 +1,37 @@
+board:
+  name: minneuro_rhs_devkit
+  full_name: MinNeuro RHS DevKit
+  vendor: local
+  socs:
+    - name: nrf54l15
+      variants:
+        - name: ns
+          cpucluster: cpuapp
+runners:
+  run_once:
+    '--recover':
+      - runners:
+          - nrfjprog
+          - nrfutil
+        run: first
+        groups:
+          - boards:
+              - minneuro_rhs_devkit/nrf54l15/cpuapp/ns
+    '--erase':
+      - runners:
+          - nrfjprog
+          - jlink
+          - nrfutil
+        run: first
+        groups:
+          - boards:
+              - minneuro_rhs_devkit/nrf54l15/cpuapp/ns
+    '--reset':
+      - runners:
+          - nrfjprog
+          - jlink
+          - nrfutil
+        run: last
+        groups:
+          - boards:
+              - minneuro_rhs_devkit/nrf54l15/cpuapp/ns

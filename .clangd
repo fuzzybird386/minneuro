@@ -1,0 +1,9 @@
+# clangd / Cursor: use Zephyr app image compilation database after a successful build.
+# Run ./build.sh (exports -DCMAKE_EXPORT_COMPILE_COMMANDS=ON) first.
+#
+# Strip GCC-only flags that host clang does not understand (avoids false "Unknown argument" on every file).
+CompileFlags:
+  CompilationDatabase: build/minneuro_mvp_band_core-main
+  Remove:
+    - -mfp16-format=ieee
+    - -fno-reorder-functions

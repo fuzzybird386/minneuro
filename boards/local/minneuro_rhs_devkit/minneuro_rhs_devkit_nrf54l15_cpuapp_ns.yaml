@@ -1,0 +1,15 @@
+# SPDX-License-Identifier: Apache-2.0
+
+identifier: minneuro_rhs_devkit/nrf54l15/cpuapp/ns
+name: MINNEURO-RHS-DEVKIT-nRF54L15-Application-Non-Secure
+type: mcu
+arch: arm
+toolchain:
+  - gnuarmemb
+  - zephyr
+sysbuild: true
+ram: 256
+flash: 1524
+supported:
+  - counter
+  - gpio

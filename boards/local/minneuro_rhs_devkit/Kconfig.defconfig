@@ -1,0 +1,19 @@
+# SPDX-License-Identifier: Apache-2.0
+
+DT_CHOSEN_Z_CODE_PARTITION := zephyr,code-partition
+
+if BOARD_MINNEURO_RHS_DEVKIT_NRF54L15_CPUAPP_NS
+
+config HAS_BT_CTLR
+	default BT
+
+config FLASH_LOAD_OFFSET
+	default $(dt_chosen_reg_addr_hex,$(DT_CHOSEN_Z_CODE_PARTITION))
+
+config FLASH_LOAD_SIZE
+	default $(dt_chosen_reg_size_hex,$(DT_CHOSEN_Z_CODE_PARTITION))
+
+config BUILD_WITH_TFM
+	default y
+
+endif

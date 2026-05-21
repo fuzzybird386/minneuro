@@ -1,0 +1,9 @@
+# SPDX-License-Identifier: Apache-2.0
+
+config BOARD_MINNEURO_RHS_DEVKIT
+	bool
+
+config BOARD_MINNEURO_RHS_DEVKIT_NRF54L15_CPUAPP_NS
+	bool
+	select BOARD_MINNEURO_RHS_DEVKIT
+	select SOC_NRF54L15_CPUAPP
