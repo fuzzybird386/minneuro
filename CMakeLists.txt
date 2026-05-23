@@ -26,5 +26,7 @@ FILE(GLOB app_sources CONFIGURE_DEPENDS
   driver/*.c
   driver/*.h
 )
+# Zephyr SPI DAC shim — unused: stim uses dac80501.c + dac80501_hal via spim00_bus only.
+list(FILTER app_sources EXCLUDE REGEX ".*/dac_dac80501_spi\\.c$")
 target_sources(app PRIVATE ${app_sources} src/main.c)
 target_include_directories(app PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})

@@ -145,31 +145,20 @@
 	status = "disabled";
 };
 
+/*
+ * SPIM00 is owned by application HAL: spim00_bus (SD file_nrf54_hal, dac80501_hal, ks1092).
+ * Keep Zephyr &spi00 disabled so spi_nrfx does not share the same nrfx instance.
+ */
 &spi00 {
 	compatible = "nordic,nrf-spim";
-	status = "okay";
+	status = "disabled";
 	pinctrl-0 = <&spi00_default>;
 	pinctrl-1 = <&spi00_sleep>;
 	pinctrl-names = "default", "sleep";
-	cs-gpios = <&gpio2 5 GPIO_ACTIVE_LOW>;
-
-	/* Disabled during SD-card/SPI bring-up: DAC80501 uses spi00 with SPI_MODE_CPHA (mode 1),
-	 * which conflicts with sharing the same SPIM instance as the SD SPI HAL (mode 0).
-	 * Re-enable when DAC path is migrated onto Zephyr SPI with coordinated bus usage.
-	 */
-	stim_dac: dac80501@0 {
-		compatible = "ti,dac80501-spi";
-		status = "disabled";
-		reg = <0>;
-		spi-max-frequency = <8000000>;
-		voltage-reference = "internal";
-		output-gain = "div2-x2";
-		#io-channel-cells = <1>;
-	};
 };
 
 &adc {
-	status = "disabled";
+	status = "okay";
 };
 
 &radio {

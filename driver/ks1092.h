@@ -9,10 +9,14 @@
  * Dual-channel EEG analog front-end configured over SPI, with analog outputs
  * sampled by the nRF SAADC.
  *
+ * SPI channel programming (writes / readback CHxSET) is optional via
+ * KS1092_SPI_PROG in ks1092.c (default 0 = power sequence only, KS1092 POR
+ * defaults).
+ *
  * Public API:
- * - ks1092_init(): initialize GPIO state and SAADC.
- * - ks1092_reset(): apply the default channel register configuration.
- * - ks1092_read_eeg(): read both EEG output voltages in microvolts.
+ * - ks1092_init(): GPIO CS/enable, SPIM bus init, SAADC init.
+ * - ks1092_reset(): power-cycle ENABLE; optionally SPI reset + register apply.
+ * - ks1092_read_eeg(): SAADC readings converted to microvolts.
  */
 
 typedef enum {

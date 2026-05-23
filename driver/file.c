@@ -6,7 +6,7 @@
  *     → f_write()           [FatFs]
  *       → disk_write()      [diskio layer, end of this file]
  *         → sd_write_block()
- *           → file_xfer()   [HAL: file_nrf54_hal.c → nrfx_spim]
+ *           → file_xfer()   [HAL: file_nrf54_hal.c → spim00_bus]
  *
  * SD protocol reference: Physical Layer Simplified Spec v9 §7 (SPI mode).
  *
@@ -348,12 +348,23 @@ DSTATUS disk_initialize(BYTE drv)
     return STA_NOINIT;
   }
 
-  file_spi_set_slow();
+  /* Cold power / SPI bus contention: first CMD0 sometimes fails; retry after CS high idle. */
+  enum {
+    SD_DISK_INIT_TRIES = 6,
+    SD_DISK_INIT_RETRY_DELAY_MS = 80,
+  };
 
-  if (sd_init() != 0) {
-    return STA_NOINIT;
+  for (unsigned try_n = 0U; try_n < SD_DISK_INIT_TRIES; try_n++) {
+    if (try_n > 0U) {
+      file_cs_deselect();
+      k_msleep(SD_DISK_INIT_RETRY_DELAY_MS);
+    }
+    file_spi_set_slow();
+    if (sd_init() == 0) {
+      return 0;
+    }
   }
-  return 0;
+  return STA_NOINIT;
 }
 
 DSTATUS disk_status(BYTE drv)
@@ -700,6 +711,65 @@ int file_read_text(const char *path, char *buf, size_t buf_len, size_t *out_len)
 
   UINT bytes_read = 0;
   fr = f_read(&f, buf, (UINT)(buf_len - 1U), &bytes_read);
+  f_close(&f);
+
+  k_mutex_unlock(&s_mutex);
+
+  if (fr != FR_OK) {
+    return -EIO;
+  }
+
+  buf[bytes_read] = '\0';
+  if (out_len != NULL) {
+    *out_len = (size_t)bytes_read;
+  }
+  return 0;
+}
+
+int file_read_tail_text(const char *path, char *buf, size_t buf_len, size_t tail_max,
+                       size_t *out_len)
+{
+  if (path == NULL || buf == NULL || buf_len == 0U || tail_max == 0U) {
+    return -EINVAL;
+  }
+
+  char fat[160];
+  int rc = api_to_fat(path, fat, sizeof(fat));
+  if (rc != 0) {
+    return rc;
+  }
+
+  k_mutex_lock(&s_mutex, K_FOREVER);
+
+  FIL f;
+  FRESULT fr = f_open(&f, fat, FA_READ);
+  if (fr != FR_OK) {
+    k_mutex_unlock(&s_mutex);
+    return -ENOENT;
+  }
+
+  FSIZE_t sz = f_size(&f);
+  FSIZE_t capacity = (FSIZE_t)(buf_len - 1U);
+  FSIZE_t want = (FSIZE_t)tail_max;
+  if (want > sz) {
+    want = sz;
+  }
+  if (want > capacity) {
+    want = capacity;
+  }
+
+  UINT bytes_read = 0;
+
+  if (want == (FSIZE_t)0U) {
+    fr = FR_OK;
+  } else {
+    FSIZE_t pos = sz - want;
+    fr = f_lseek(&f, pos);
+    if (fr == FR_OK) {
+      fr = f_read(&f, buf, (UINT)want, &bytes_read);
+    }
+  }
+
   f_close(&f);
 
   k_mutex_unlock(&s_mutex);

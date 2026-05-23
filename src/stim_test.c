@@ -281,7 +281,7 @@ static void stim_test_thread_main(void *arg1, void *arg2, void *arg3)
 
   while (true) {
     //for (size_t i = 0u; i < ARRAY_SIZE(s_stim_test_sequence); ++i) {
-      const stim_test_step_t *step = &s_stim_test_sequence[0];
+      const stim_test_step_t *step = &s_stim_test_sequence[1];
       int err;
 
       LOG_INF("stim test %s: %u Hz, %u ms, %u uA",
@@ -326,7 +326,7 @@ int stim_test_start(void)
     return err;
   }
   neuro_ctrl_set_switch(false);
-  
+
   stim_test_select_output_path();
   stim_test_enable_output();
 

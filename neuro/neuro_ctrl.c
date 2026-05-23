@@ -2,14 +2,19 @@
 
 #include <errno.h>
 #include <stdbool.h>
+#include <stdint.h>
+#include <inttypes.h>
 #include <string.h>
 
 #include <hal/nrf_gpio.h>
 #include <zephyr/kernel.h>
+#include <zephyr/logging/log.h>
 
 #include "neuro/inc/eeg_ctrl.h"
 #include "neuro/inc/wave_ctrl.h"
 #include "src/inc/bsp.h"
+
+LOG_MODULE_REGISTER(neuro_ctrl, LOG_LEVEL_INF);
 
 enum {
   NEURO_CTRL_THREAD_STACK_SIZE = 3072,
@@ -87,6 +92,8 @@ static int neuro_ctrl_run_cycle(void)
   neuro_stim_plan_t stim_plan;
   int err;
 
+  memset(&frame, 0, sizeof(frame));
+
   neuro_ctrl_set_phase(NEURO_CTRL_PHASE_EEG_ACQUIRE);
   neuro_ctrl_set_switch(true);
 
@@ -101,6 +108,14 @@ static int neuro_ctrl_run_cycle(void)
       break;
     }
     if (err != -EAGAIN) {
+      if (frame.sample_count > 0U) {
+        const eeg_ctrl_sample_t *last = &frame.samples[frame.sample_count - 1U];
+        LOG_WRN("read_frame err=%d frame_pts=%u eeg1=%d eeg2=%d", err,
+                (unsigned int)frame.sample_count, (int)last->ch1_uv,
+                (int)last->ch2_uv);
+      } else {
+        LOG_WRN("read_frame err=%d frame_pts=0", err);
+      }
       (void)eeg_ctrl_stop();
       return err;
     }
@@ -112,6 +127,23 @@ static int neuro_ctrl_run_cycle(void)
     return 0;
   }
 
+  if (frame.sample_count > 0U) {
+    const unsigned int n = (unsigned int)frame.sample_count;
+    const unsigned int last = (unsigned int)(frame.sample_count - 1u);
+    LOG_INF(
+        "eeg frame pts=%u eeg1[0]=%d eeg2[0]=%d eeg1[%u]=%d eeg2[%u]=%d (quant_uV)",
+        n, (int)frame.samples[0].ch1_uv, (int)frame.samples[0].ch2_uv,
+        last, (int)frame.samples[last].ch1_uv, last,
+        (int)frame.samples[last].ch2_uv);
+  } else {
+    LOG_WRN("eeg frame pts=0 (unexpected)");
+  }
+
+/*数据存储同步信号发送点
+
+
+
+*/
   neuro_ctrl_set_phase(NEURO_CTRL_PHASE_ANALYZE);
   err = eeg_algo_analyze_frame(&s_neuro_ctrl.eeg_algo_ctx, &frame, &eeg_result);
   if (err) {
@@ -141,6 +173,10 @@ static int neuro_ctrl_run_cycle(void)
 
   stim_buffer.pattern = s_neuro_ctrl.stim_pattern;
   stim_buffer.pattern_capacity = ARRAY_SIZE(s_neuro_ctrl.stim_pattern);
+
+
+
+  /*test point*/
   err = neuro_stim_bank_generate(&stim_request, &s_neuro_ctrl.wave_cfg, &stim_buffer, &stim_plan);
   if (err) {
     neuro_ctrl_set_phase(NEURO_CTRL_PHASE_SKIP_STIM);
@@ -188,14 +224,21 @@ static void neuro_ctrl_thread_main(void *arg1, void *arg2, void *arg3)
       continue;
     }
 
-    if (neuro_ctrl_run_cycle() == 0) {
+    const int rv = neuro_ctrl_run_cycle();
+
+    if (rv == 0) {
+      uint32_t cyc;
+
       k_mutex_lock(&s_neuro_ctrl.lock, K_FOREVER);
       s_neuro_ctrl.cycle_index++;
       s_neuro_ctrl.state.cycle_index = s_neuro_ctrl.cycle_index;
+      cyc = s_neuro_ctrl.cycle_index;
       k_mutex_unlock(&s_neuro_ctrl.lock);
+      LOG_INF("neuro_ctrl: cycle %" PRIu32 " complete", cyc);
       continue;
     }
 
+    LOG_WRN("neuro_ctrl: run_cycle failed err=%d (retry 100ms)", rv);
     k_msleep(100);
   }
 }

@@ -6,14 +6,26 @@
 #include <stdint.h>
 
 #include <hal/nrf_gpio.h>
-#include <hal/nrf_spim.h>
 #include <zephyr/kernel.h>
+#include <zephyr/sys/printk.h>
 
 #include "board_adc.h"
 #include "spim00_bus.h"
 #include "src/inc/bsp.h"
+#include <zephyr/logging/log.h>
+
+#if !defined(KS1092_SPI_PROG)
+#define KS1092_SPI_PROG 0
+#endif
+
+#if KS1092_SPI_PROG
+#include <hal/nrf_spim.h>
+#endif
+
+LOG_MODULE_REGISTER(ks1092, LOG_LEVEL_INF);
 
 enum {
+#if KS1092_SPI_PROG
   KS1092_SPI_CLK_HZ = NRFX_MHZ_TO_HZ(4),
   KS1092_OPCODE_RESET = 0xFE,
   KS1092_OPCODE_RREG_BASE = 0x10,
@@ -22,12 +34,13 @@ enum {
   KS1092_STAGE2_SHIFT = 2,
   KS1092_STAGE2_MASK = 0x1Cu,
   KS1092_STAGE1_MASK = 0x03u,
+  KS1092_SPI_INTERFRAME_US = 10,
+#endif
   KS1092_CHANNEL_COUNT = 2,
   KS1092_ADC_RESOLUTION_BITS = 12,
   KS1092_POWER_SETTLE_MS = 5,
   KS1092_RESET_PULSE_MS = 1,
   KS1092_RESET_RECOVERY_MS = 2,
-  KS1092_SPI_INTERFRAME_US = 10,
 };
 
 /*
@@ -44,11 +57,13 @@ enum {
   KS1092_CHLEN_LEVEL = 0,
 };
 
+#if KS1092_SPI_PROG
 static const spim00_bus_config_t s_ks1092_spi_cfg = {
   .frequency_hz = KS1092_SPI_CLK_HZ,
   .mode = NRF_SPIM_MODE_1,
   .orc = 0x00u,
 };
+#endif
 
 static bool s_initialized;
 static ks1092_config_t s_cfg;
@@ -66,14 +81,15 @@ static const ks1092_config_t s_default_cfg = {
   },
 };
 
-static void ks1092_select(void)
-{
-  nrf_gpio_pin_clear(PIN_SPI_CS_EEG);
-}
-
 static void ks1092_deselect(void)
 {
   nrf_gpio_pin_set(PIN_SPI_CS_EEG);
+}
+
+#if KS1092_SPI_PROG
+static void ks1092_select(void)
+{
+  nrf_gpio_pin_clear(PIN_SPI_CS_EEG);
 }
 
 static int ks1092_spi_write(const uint8_t *tx, size_t len)
@@ -183,7 +199,8 @@ static uint8_t ks1092_encode_channel(const ks1092_channel_cfg_t *cfg, bool is_ch
     reg |= (uint8_t)(1u << KS1092_CHANNEL_PD_BIT);
   }
 
-  reg |= (uint8_t)(((uint8_t)cfg->stage2_gain << KS1092_STAGE2_SHIFT) & KS1092_STAGE2_MASK);
+  reg |= (uint8_t)(((uint8_t)cfg->stage2_gain << KS1092_STAGE2_SHIFT) &
+                   KS1092_STAGE2_MASK);
   reg |= (uint8_t)((uint8_t)cfg->stage1_gain & KS1092_STAGE1_MASK);
   return reg;
 }
@@ -191,13 +208,16 @@ static uint8_t ks1092_encode_channel(const ks1092_channel_cfg_t *cfg, bool is_ch
 static int ks1092_apply_config(const ks1092_config_t *cfg)
 {
   uint8_t regs[KS1092_CHANNEL_COUNT];
+  const uint8_t exp0 = ks1092_encode_channel(&cfg->ch1, false);
+  const uint8_t exp1 = ks1092_encode_channel(&cfg->ch2, true);
   int err;
 
-  regs[0] = ks1092_encode_channel(&cfg->ch1, false);
-  regs[1] = ks1092_encode_channel(&cfg->ch2, true);
+  regs[0] = exp0;
+  regs[1] = exp1;
 
   err = ks1092_write_registers(KS1092_REG_CH1SET, regs, KS1092_CHANNEL_COUNT);
   if (err) {
+    LOG_ERR("ks1092_write_registers: ks1092_write_registers failed (%d)", err);
     return err;
   }
 
@@ -205,16 +225,21 @@ static int ks1092_apply_config(const ks1092_config_t *cfg)
 
   err = ks1092_read_registers(KS1092_REG_CH1SET, regs, KS1092_CHANNEL_COUNT);
   if (err) {
+    LOG_ERR("ks1092_read_registers: ks1092_read_registers failed (%d)", err);
     return err;
   }
 
-  if (regs[0] != ks1092_encode_channel(&cfg->ch1, false) ||
-      regs[1] != ks1092_encode_channel(&cfg->ch2, true)) {
+  if (regs[0] != exp0 || regs[1] != exp1) {
+    printk(
+        "ks1092: CHxSET readback mismatch rb=%02x %02x expect %02x %02x "
+        "(SPI/CS/power or KS1092_CHLEN_LEVEL vs board wiring?)\n",
+        regs[0], regs[1], exp0, exp1);
     return -EIO;
   }
 
   return 0;
 }
+#endif /* KS1092_SPI_PROG */
 
 static float ks1092_saadc_raw_to_uv(nrf_saadc_value_t raw)
 {
@@ -234,6 +259,11 @@ int ks1092_init(void)
   nrf_gpio_cfg_output(PIN_EEG_ENABLE);
   nrf_gpio_pin_clear(PIN_EEG_ENABLE);
 
+  err = spim00_bus_init();
+  if (err != 0) {
+    return err;
+  }
+
   err = board_adc_init();
   if (err) {
     return err;
@@ -245,30 +275,38 @@ int ks1092_init(void)
 
 int ks1092_reset(void)
 {
-  uint8_t cmd = KS1092_OPCODE_RESET;
   int err;
 
   err = ks1092_init();
   if (err) {
     return err;
   }
-
   nrf_gpio_pin_clear(PIN_EEG_ENABLE);
   k_msleep(KS1092_RESET_PULSE_MS);
   nrf_gpio_pin_set(PIN_EEG_ENABLE);
   k_msleep(KS1092_POWER_SETTLE_MS);
 
-  err = ks1092_spi_write(&cmd, sizeof(cmd));
-  if (err) {
-    return err;
-  }
+#if KS1092_SPI_PROG
+  {
+    uint8_t cmd = KS1092_OPCODE_RESET;
 
+    err = ks1092_spi_write(&cmd, sizeof(cmd));
+    if (err) {
+      LOG_ERR("ks1092_reset: ks1092_spi_write failed (%d)", err);
+      return err;
+    }
+
+    k_msleep(KS1092_RESET_RECOVERY_MS);
+
+    err = ks1092_apply_config(&s_default_cfg);
+    if (err) {
+      LOG_ERR("ks1092_reset: ks1092_apply_config failed (%d)", err);
+      return err;
+    }
+  }
+#else
   k_msleep(KS1092_RESET_RECOVERY_MS);
-
-  err = ks1092_apply_config(&s_default_cfg);
-  if (err) {
-    return err;
-  }
+#endif
 
   s_cfg = s_default_cfg;
   return 0;
