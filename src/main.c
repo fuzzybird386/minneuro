@@ -57,11 +57,11 @@ int main(void)
    * Note: simultaneous stim_test DAC streaming and neuro wave_ctrl DAC use must be coordinated.
    */
   // err = neuro_ctrl_start();
-  // if (err != 0) {
-  //   LOG_ERR("neuro_ctrl_start failed (%d)", err);
-  // } else {
-  //   LOG_INF("neuro_ctrl main loop enabled (running=true)");
-  // }
+  if (err != 0) {
+    LOG_ERR("neuro_ctrl_start failed (%d)", err);
+  } else {
+    LOG_INF("neuro_ctrl main loop enabled (running=true)");
+  }
 
   for (;;) {
     //LOG_INF("keep working :(");
