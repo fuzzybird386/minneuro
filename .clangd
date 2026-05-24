@@ -1,9 +1,14 @@
-# clangd / Cursor: use Zephyr app image compilation database after a successful build.
-# Run ./build.sh (exports -DCMAKE_EXPORT_COMPILE_COMMANDS=ON) first.
+# clangd / Cursor: Zephyr sysbuild puts compile_commands.json under build/<image>/.
+# Rebuild with CMAKE_EXPORT_COMPILE_COMMANDS=ON (NCS Connect or ./build.sh) after Kconfig/source changes.
 #
 # Strip GCC-only flags that host clang does not understand (avoids false "Unknown argument" on every file).
 CompileFlags:
-  CompilationDatabase: build/minneuro_mvp_band_core-main
+  CompilationDatabase: build/minneuro
   Remove:
     - -mfp16-format=ieee
     - -fno-reorder-functions
+    - --param=min-pagesize=0
+    - -specs=picolibc.specs
+
+Index:
+  Background: Build

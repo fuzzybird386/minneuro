@@ -26,7 +26,7 @@ if [[ -z "${TOOL_OPT}" ]]; then
 fi
 
 export ZEPHYR_SDK_INSTALL_DIR="${TOOL_OPT}/zephyr-sdk"
-export PATH="${TOOL_OPT}/dtc/bin:${TOOL_OPT}/zephyr-sdk/arm-zephyr-eabi/bin:${PATH}"
+export PATH="${TOOL_OPT}/ccache/bin:${TOOL_OPT}/dtc/bin:${TOOL_OPT}/zephyr-sdk/arm-zephyr-eabi/bin:${PATH}"
 
 PY312="${TOOL_OPT}/python@3.12/bin/python3.12"
 PY312_ALT="${TOOL_OPT}/python@3.12/bin/python3"

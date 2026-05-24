@@ -1,0 +1,14 @@
+{
+  "C_Cpp.intelliSenseEngine": "disabled",
+  "C_Cpp.autocomplete": "disabled",
+  "C_Cpp.errorSquiggles": "disabled",
+  "C_Cpp.codeAnalysis.runAutomatically": false,
+  "clangd.enable": true,
+  "clangd.onConfigChanged": "restart",
+  "clangd.checkUpdates": false,
+  "clangd.arguments": [
+    "--background-index",
+    "--header-insertion=never",
+    "--compile-commands-dir=build/minneuro"
+  ]
+}

@@ -54,7 +54,7 @@ static void sd_fs_test_thread(void *arg1, void *arg2, void *arg3)
   ARG_UNUSED(arg3);
 
   printk("sd loop thread spawned\n");
-  k_msleep(200);
+  k_msleep(235);
 
   LOG_INF("begin");
 
